@@ -5,7 +5,6 @@
 -export([equery/3]).
 
 -export([query/2]).
--export([to_map/2]).
 
 -spec connect() ->
     {ok, Connection :: pid()} | {error, Reason :: atom() | tuple()}.
@@ -24,7 +23,7 @@ connect() ->
     },
     epgsql:connect(Opts).
 
-- spec close(Connection :: pid()) -> ok.
+-spec close(Connection :: pid()) -> ok.
 close(Connection) ->
     epgsql:close(Connection).
 
@@ -36,18 +35,8 @@ close(Connection) ->
 equery(Connect, Query, Params) ->
     epgsql:equery(Connect, Query, Params).
 
-query(Query, Params) ->
+query(Query, Params) -> %% Швидке рішення, що повинно бути замінене пулом
     {ok, Connection} = connect(),
     Res = equery(Connection, Query, Params),
     close(Connection),
     Res.
-
-to_map([{column,_,_,_,_,_,_,_,_}|_] = Columns0, Rows) ->
-    Columns = [Column||{column,Column,_,_,_,_,_,_,_} <- Columns0],
-    to_map(Columns, Rows);
-to_map(Columns, Rows) ->
-    [begin
-        ValuesList = tuple_to_list(Row),
-        Proplist = lists:zip(Columns, ValuesList),
-        maps:from_list(Proplist)
-    end || Row <- Rows].

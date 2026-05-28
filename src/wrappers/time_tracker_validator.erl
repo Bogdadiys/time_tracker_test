@@ -42,7 +42,7 @@ validate(<<"/work_time/set">>, Data) ->
     Schema = #{
         <<"user_id">> => [required, positive_integer],
         <<"start_time">> => [required, time],
-        <<"stop_time">> => [required, time],
+        <<"end_time">> => [required, time],
         <<"days">> => [required, positive_integer]
     },
     liver:validate(Schema, Data, #{return => map});
@@ -56,7 +56,12 @@ validate(<<"/work_time/add_exclusion">>, Data) ->
         <<"user_id">> => [required, positive_integer],
         <<"type_exclusion">> => [required, string, {one_of, [<<"come later">>, <<"leave earlier">>, <<"full-time">>]}],
         <<"start_datetime">> => [required, iso_dt],
-        <<"stop_datetime">> => [required, iso_dt]
+        <<"end_datetime">> => [required, iso_dt]
+    },
+    liver:validate(Schema, Data, #{return => map});
+validate(<<"/work_time/delete_exclusion">>, Data) ->
+    Schema = #{
+        <<"id">> => [required, positive_integer]
     },
     liver:validate(Schema, Data, #{return => map});
 validate(<<"/work_time/get_exclusion">>, Data) ->
@@ -69,10 +74,24 @@ validate(<<"/work_time/history_by_user">>, Data) ->
         <<"user_id">> => [required, positive_integer]
     },
     liver:validate(Schema, Data, #{return => map});
-validate(<<"/work_time/statistic_by_user">>, Data) ->
+validate(<<"/work_time/statistics_by_user">>, Data) ->
     Schema = #{
         <<"user_id">> => [required, positive_integer],
         <<"filter">> => [string, {one_of, [<<"week">>, <<"month">>, <<"year">>, <<"all_time">>]}, {default, <<"month">>}]
+    },
+    liver:validate(Schema, Data, #{return => map});
+validate(<<"/user/create">>, Data) ->
+    Schema = #{
+        <<"user_name">> => [required, string]
+    },
+    liver:validate(Schema, Data, #{return => map});
+validate(<<"/user/delete">>, Data) ->
+    Schema = #{
+        <<"user_id">> => [required, positive_integer]
+    },
+    liver:validate(Schema, Data, #{return => map});
+validate(<<"/user/list">>, Data) ->
+    Schema = #{
     },
     liver:validate(Schema, Data, #{return => map});
 validate(_Path, Data) ->
@@ -147,10 +166,10 @@ iso_dt_validate(YearBin, MonthBin, DayBin, HoursBin, MinutesBin, SecondsBin) ->
     end.
 
 format_date(YearBin, MonthBin, DayBin) ->
-        Year    = binary_to_integer(YearBin),
-        Month   = binary_to_integer(MonthBin),
-        Day     = binary_to_integer(DayBin),
-        {Year, Month, Day}.
+    Year  = binary_to_integer(YearBin),
+    Month = binary_to_integer(MonthBin),
+    Day   = binary_to_integer(DayBin),
+    {Year, Month, Day}.
 
 format_time(HoursBin, MinutesBin, SecondsBin) ->
     Hours   = binary_to_integer(HoursBin),

@@ -70,12 +70,14 @@
 2. **Прив'язка картки.** `POST /card/assign` пов'язує UUID картки з
    користувачем.
 3. **Облік приходу/відходу.** `POST /card/touch` — перший дотик за добу
-   фіксує прихід, наступний оновлює час відходу. Відповідь містить
-   `event_type` = `arrival` | `leave`.
+   фіксує прихід (`event_type` = `arrival`), другий — відхід
+   (`event_type` = `leave`) і встановлює час відходу **рівно один раз**.
+   Наступні дотики за ту саму добу нічого не змінюють (час відходу
+   «заморожено») і повертають помилку `already_closed`.
 4. **Винятки.** `POST /work_time/add_exclusion` реєструє узгоджене
    відхилення на період.
 5. **Звіти.** `POST /work_time/history_by_user` повертає журнал, а
-   `POST /work_time/statistic_by_user` — агреговану статистику за
+   `POST /work_time/statistics_by_user` — агреговану статистику за
    `week` / `month` / `year` / `all_time`.
 
 ---
@@ -130,8 +132,9 @@
 5. `*_api` виконує запит через `time_tracker_db` і повертає `{ok, _}` / `ok`
    / `{error, _}`.
 6. `time_tracker_handler_utils:encode_result/1` загортає результат у JSON.
-7. HTTP відповідає кодом статусу; MQ публікує відповідь у чергу `reply_to`
-   з тим самим `correlation_id` (RPC-патерн).
+7. HTTP відповідає кодом статусу; MQ публікує відповідь у дефолтний exchange
+   (`<<"">>`) з routing key `reply_to` і тим самим `correlation_id`
+   (RPC-патерн).
 
 ### Компоненти системи
 
@@ -150,9 +153,6 @@
 | `time_tracker_work_time_api` | api | Графік, винятки, історія, статистика. |
 | `time_tracker_handler_utils` | utils | Маршрутизація `dispatch/2` та формування відповіді `encode_result/1`. |
 | `time_tracker_utils` | utils | Форматування часу (`time_to_binary/1`). |
-
-> Вихідні файли handler-ів лежать у каталозі `src/handelrs/` (саме так,
-> з історичним одруком у назві).
 
 ---
 
@@ -173,7 +173,9 @@
   `is_late`, `is_leave`, `is_late_reason`, `is_leave_reason`; первинний ключ
   `(user_id, date)`, FK на `users(id)` з cascade. Прихід/відхід оновлюються
   через `INSERT ... ON CONFLICT (user_id, date) DO UPDATE`, а ознака приходу
-  визначається за `xmax = 0`.
+  визначається за `xmax = 0`. Гілка `DO UPDATE` обмежена умовою
+  `WHERE stop_time IS NULL`, тож `stop_time` встановлюється рівно один раз за
+  добу (перший відхід), а подальші дотики не оновлюють жодного рядка.
 
 Усі дочірні таблиці видаляються каскадно разом із користувачем.
 
@@ -203,16 +205,17 @@ catch-all: будь-який `POST` із JSON-тілом, де **сам URL-шл
 | `POST` | `/user/delete` | `user_id` | Видалити користувача. |
 | `POST` | `/user/list` | — | Список користувачів з очікуваним графіком. |
 | `POST` | `/card/assign` | `card_uid`, `user_id` | Прив'язати картку до користувача. |
-| `POST` | `/card/touch` | `card_uid` | Зафіксувати прихід/відхід → `event_type`. |
+| `POST` | `/card/touch` | `card_uid` | Зафіксувати прихід/відхід → `event_type`; повторний відхід за добу → `already_closed`. |
 | `POST` | `/card/delete` | `card_uid` | Видалити картку. |
 | `POST` | `/card/list_by_user` | `user_id` | Картки користувача. |
 | `POST` | `/card/delete_all_by_user` | `user_id` | Видалити всі картки користувача. |
-| `POST` | `/work_time/set` | `user_id`, `start_time`, `stop_time`, `days` | Задати графік. |
+| `POST` | `/work_time/set` | `user_id`, `start_time`, `end_time`, `days` | Задати графік. |
 | `POST` | `/work_time/get` | `user_id` | Отримати графік. |
-| `POST` | `/work_time/add_exclusion` | `user_id`, `type_exclusion`, `start_datetime`, `stop_datetime` | Додати виняток. |
+| `POST` | `/work_time/add_exclusion` | `user_id`, `type_exclusion`, `start_datetime`, `end_datetime` | Додати виняток → `{exclusion, user_id}`. |
+| `POST` | `/work_time/delete_exclusion` | `id` | Видалити виняток за його `id`. |
 | `POST` | `/work_time/get_exclusion` | `user_id` | Винятки користувача. |
 | `POST` | `/work_time/history_by_user` | `user_id` | Журнал приходів/відходів. |
-| `POST` | `/work_time/statistic_by_user` | `user_id`, `filter` | Агрегована статистика. |
+| `POST` | `/work_time/statistics_by_user` | `user_id`, `filter` | Агрегована статистика (`filter` за замовч. `month`). |
 
 Коди відповіді HTTP-handler-а:
 
@@ -239,10 +242,21 @@ catch-all: будь-який `POST` із JSON-тілом, де **сам URL-шл
 - моніторить процеси з'єднання й каналу — при падінні `gen_server` зупиняється
   й перезапускається супервізором.
 
-Кожне вхідне повідомлення обробляється як **RPC**: шлях береться із заголовка
-`method`, дані проходять той самий `validate → dispatch`, а результат
-публікується назад у чергу з `reply_to`, зберігаючи `correlation_id`. Після
-публікації повідомлення підтверджується (`basic.ack`).
+Кожне вхідне повідомлення обробляється як **RPC**. З властивостей і заголовків
+повідомлення беруться:
+
+- заголовок `method` — шлях маршрутизації (аналог URL у HTTP);
+- заголовок `content-type` — формат тіла (за замовч. `application/json`);
+- властивості `reply_to` (routing key відповіді) та `correlation_id`.
+
+Далі дані проходять той самий `validate → dispatch`, а результат публікується
+в дефолтний exchange (`<<"">>`) з routing key `reply_to`, зберігаючи
+`correlation_id`. Після публікації повідомлення підтверджується (`basic.ack`).
+
+> Зв'язування черги (`bind_queue`) та підписка (`basic_consume`) у
+> `time_tracker_amqp` не передають ім'я черги явно — вони покладаються на
+> семантику RabbitMQ «остання оголошена на каналі черга» (саме тому
+> `declare_queue` викликається безпосередньо перед ними в `init/1`).
 
 ---
 
@@ -267,16 +281,21 @@ catch-all: будь-який `POST` із JSON-тілом, де **сам URL-шл
 ```erlang
 {time_tracker_test, [
     {cowboy_port, 8181},
-    {db_host, "localhost"}, {db_port, 5431},
-    {db_user, "postgres"}, {db_password, "password"}
+    {db_host, "localhost"}, {db_port, 5432},
+    {db_user, "postgres"}, {db_password, "password"},
+    {mq_username, <<"guest">>}, {mq_password, <<"guest">>},
+    {mq_host, "localhost"}
 ]}
 ```
 
-Параметри RabbitMQ у конфіг не винесені — `time_tracker_amqp` бере їх з
-оточення застосунку зі значеннями за замовчуванням: `mq_host` = `"localhost"`,
-`mq_username` / `mq_password` = `<<"guest">>`, `mq_exchange` =
-`<<"time_tracker_exchange">>`. Логування налаштоване через стандартний OTP
-`logger` (файли `log/error.log`, `log/info.log` + консоль).
+Хост і облікові дані RabbitMQ (`mq_host`, `mq_username`, `mq_password`)
+винесені в конфіг; `time_tracker_amqp` читає їх з оточення застосунку, а за
+відсутності — використовує ті ж значення за замовчуванням (`"localhost"`,
+`<<"guest">>` / `<<"guest">>`). У конфіг **не** винесено лише назву exchange:
+`mq_exchange` читається в `time_tracker_mq_handler` зі значенням за
+замовчуванням `<<"time_tracker_exchange">>`. Також доступний `db_timeout`
+(за замовч. `5000`), якого в `dev.config` немає. Логування налаштоване через
+стандартний OTP `logger` (файли `log/error.log`, `log/info.log` + консоль).
 
 > `Makefile` очікує `env/$(CONFIG).config`, тож `make CONFIG=prod` спрацює лише
 > після додавання відповідного `prod.config`.
@@ -285,11 +304,11 @@ catch-all: будь-який `POST` із JSON-тілом, де **сам URL-шл
 
 ## Збірка та запуск
 
-Потрібні працюючі **Postgres** (за замовч. `localhost:5431`) та **RabbitMQ**
+Потрібні працюючі **Postgres** (за замовч. `localhost:5432`) та **RabbitMQ**
 (`localhost:5672`). Перед першим запуском застосуйте схему:
 
 ```bash
-psql -h localhost -p 5431 -U postgres -f db.sql
+psql -h localhost -p 5432 -U postgres -f db.sql
 ```
 
 ```bash
@@ -325,7 +344,8 @@ make dialyzer    # статичний аналіз (DIALYZER_DIRS = ebin)
 - Схема застосовується одним файлом [`db.sql`](db.sql); інструмента поетапних
   міграцій немає.
 - Немає автоматизованих тестів.
-- `time_tracker_work_time_api:delete_exclusion/1` реалізовано, але не
-  під'єднано до `dispatch` і не має схеми валідації — наразі недосяжне.
 - `time_tracker_db:query/2` відкриває нове з'єднання на кожен запит (без пулу).
-- Параметри RabbitMQ не винесені в конфіг.
+- Назва exchange (`mq_exchange`) не винесена в конфіг — лише хост і облікові
+  дані RabbitMQ.
+- Зв'язування й підписка на чергу спираються на неявну «останню оголошену
+  чергу» каналу (ім'я черги не передається в `bind_queue`/`basic_consume`).

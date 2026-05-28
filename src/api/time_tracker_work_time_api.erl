@@ -81,7 +81,7 @@
 set(Args) ->
     UserId    = maps:get(<<"user_id">>, Args),
     StartTime = maps:get(<<"start_time">>, Args),
-    StopTime  = maps:get(<<"stop_time">>, Args),
+    StopTime  = maps:get(<<"end_time">>, Args),
     Days      = maps:get(<<"days">>, Args),
     case time_tracker_db:query(?SET_WORK_TIME_QUERY, [UserId, StartTime, StopTime, Days]) of
         {ok, 1} ->
@@ -98,7 +98,7 @@ get(Args) ->
             Map = #{
                 <<"user_id">>    => UserId,
                 <<"start_time">> => time_tracker_utils:time_to_binary(StartTime),
-                <<"stop_time">>  => time_tracker_utils:time_to_binary(StopTime),
+                <<"end_time">>   => time_tracker_utils:time_to_binary(StopTime),
                 <<"days">>       => Days
             },
             {ok, Map};
@@ -110,14 +110,14 @@ get(Args) ->
 add_exclusion(Args) ->
     UserId        = maps:get(<<"user_id">>, Args),
     StartDateTime = maps:get(<<"start_datetime">>, Args),
-    StopDateTime  = maps:get(<<"stop_datetime">>, Args),
-    TypeExclusion  = maps:get(<<"type_exclusion">>, Args),
+    StopDateTime  = maps:get(<<"end_datetime">>, Args),
+    TypeExclusion = maps:get(<<"type_exclusion">>, Args),
     case time_tracker_db:query(?ADD_EXCLUSION_QUERY, [UserId, StartDateTime, StopDateTime, TypeExclusion]) of
         {ok, 1, _, [{ExclusionId}]} ->
             Exclusion = #{
                 <<"id">>             => ExclusionId,
                 <<"start_datetime">> => StartDateTime,
-                <<"stop_datetime">>  => StopDateTime,
+                <<"end_datetime">>   => StopDateTime,
                 <<"type_exclusion">> => TypeExclusion
             },
             {ok, #{<<"exclusion">> => Exclusion, <<"user_id">> => UserId}};
@@ -144,7 +144,7 @@ get_exclusion(Args) ->
                 #{
                     <<"id">>             => ExclusionId,
                     <<"start_datetime">> => StartDateTime,
-                    <<"stop_datetime">>  => StopDateTime,
+                    <<"end_datetime">>   => StopDateTime,
                     <<"type_exclusion">> => TypeExclusion
                 }
             || {ExclusionId, StartDateTime, StopDateTime, TypeExclusion} <- ExclusionsRaw],
@@ -162,7 +162,7 @@ history_by_user(Args) ->
                 #{
                     <<"date">>       => Date,
                     <<"start_time">> => time_tracker_utils:time_to_binary(StartTime),
-                    <<"stop_time">>  => time_tracker_utils:time_to_binary(StopTime)
+                    <<"end_time">>   => time_tracker_utils:time_to_binary(StopTime)
                 }
             || {Date, StartTime, StopTime} <- HistoryRaw],
          {ok, #{<<"history">> => History, <<"user_id">> => UserId}};
@@ -180,26 +180,33 @@ statistic_by_user(Args) ->
     case time_tracker_db:query(?GET_STATISTIC_QUERY, [UserId, FirstDate, LastDate]) of
         {ok, _, [{WorkedMins, Late, LateReason, Leave, LeaveReason, Vacation}]} ->
             Days = get_days_diff(FirstDate, LastDate),
-            Weekends = ((Days div 7) * (7 - DaysAtWeek)),
+            Weekends = ((Days div 7) * (7 - DaysAtWeek)), %% Грубий розрахунок вихідних днів, без урахування поточного для тижня
             TotalDays = Days - Weekends - Vacation,
-            TotalMins = (TotalDays * DayMins) ,
+            TotalMins = (TotalDays * DayMins),
+            UnderMins = case TotalMins - WorkedMins of
+                Diff when Diff > 0 ->
+                    Diff;
+                _ ->
+                    0
+            end,
             Stat = #{
                 <<"days">> => #{
                     <<"work_days">> => TotalDays,
-                    <<"weekends">> => Weekends,
-                    <<"leave">> => Vacation
+                    <<"weekends">>  => Weekends,
+                    <<"leave">>     => Vacation
                 },
                 <<"time">> => #{
-                    <<"worked">> => time_tracker_utils:time_to_binary({WorkedMins div 60, WorkedMins rem 60, 0}),
-                    <<"total">>  => time_tracker_utils:time_to_binary({TotalMins div 60, TotalMins rem 60, 0})
+                    <<"worked">>    => time_tracker_utils:time_to_binary({WorkedMins div 60, WorkedMins rem 60, 0}),
+                    <<"total">>     => time_tracker_utils:time_to_binary({TotalMins div 60, TotalMins rem 60, 0}),
+                    <<"undertime">> => time_tracker_utils:time_to_binary({UnderMins div 60, UnderMins rem 60, 0})
                 },
                 <<"late_count">>  => #{
                     <<"without_reason">> => Late - LateReason,
-                    <<"with_reason">>  => LateReason
+                    <<"with_reason">>    => LateReason
                 },
-                <<"laeve_count">> => #{
+                <<"leave_count">> => #{
                     <<"without_reason">> => Leave - LeaveReason,
-                    <<"with_reason">> => LeaveReason
+                    <<"with_reason">>    => LeaveReason
                 }
             },
             {ok, #{<<"statistic">> => Stat, <<"user_id">> => UserId}};

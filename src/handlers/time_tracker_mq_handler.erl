@@ -82,9 +82,8 @@ handle_info({#'basic.deliver'{}, #amqp_msg{}} = Amqp, #{channel := Channel} = St
             ?ERROR(ErrLog, [Path, PrettyHeaders, MsgBinary, ReplyTo, Type, Reason, Stacktrace]),
             {error, <<"invalid_message">>}
     end,
-    {ok, Res} = time_tracker_handler_utils:encode_result(Result),
-    {ok, Response} = time_tracker_protocol:encode(Res),
-    time_tracker_amqp:publish(Channel, ?EXCHANGE, Response, ReplyTo, CorrelationId),
+    {ok, Response} = time_tracker_handler_utils:encode_result(Result),
+    time_tracker_amqp:publish(Channel, <<"">>, Response, ReplyTo, CorrelationId),
     time_tracker_amqp:ack(Channel, DTag),
     {noreply, State};
 handle_info(#'basic.consume_ok'{}, State) ->

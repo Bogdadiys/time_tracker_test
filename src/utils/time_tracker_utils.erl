@@ -10,7 +10,6 @@ time_to_binary({Hours, Minutes, Seconds}) ->
     SecondsBin = format_time(integer_to_binary(round(Seconds))),
     <<HoursBin/binary, ":", MinutesBin/binary, ":", SecondsBin/binary>>.
 
-
 format_time(<<TT:1/binary>>) ->
     <<"0", TT/binary>>;
 format_time(TT) ->
