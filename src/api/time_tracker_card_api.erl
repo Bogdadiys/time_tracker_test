@@ -59,6 +59,9 @@
 ").
 
 %% API
+-spec touch(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error | already_closed}.
 touch(Args) ->
     Date = date(),
     Time = time(),
@@ -83,6 +86,9 @@ touch(Args) ->
             {error, db_error}
     end.
 
+-spec assign(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error | already_assigned}.
 assign(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     CardId = maps:get(<<"card_uid">>, Args),
@@ -96,6 +102,9 @@ assign(Args) ->
             {error, db_error}
     end.
 
+-spec delete(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error | already_deleted}.
 delete(Args) ->
     CardId = maps:get(<<"card_uid">>, Args),
     case time_tracker_db:query(?DELETE_CARD_QUERY, [CardId]) of
@@ -108,6 +117,9 @@ delete(Args) ->
             {error, db_error}
     end.
 
+-spec list_by_user(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 list_by_user(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     case time_tracker_db:query(?GET_USER_CARDS_QUERY, [UserId]) of
@@ -119,6 +131,9 @@ list_by_user(Args) ->
             {error, db_error}
     end.
 
+-spec delete_all_by_user(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 delete_all_by_user(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     case time_tracker_db:query(?DELETE_CARDS_BY_USER_QUERY, [UserId]) of

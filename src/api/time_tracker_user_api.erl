@@ -25,16 +25,22 @@
 ").
 
 %% API
+-spec create(Args :: map()) ->
+    {ok, Response :: map()}.
 create(Args) ->
     UserName = maps:get(<<"user_name">>, Args),
     {ok, _, _, [{UserId}]} = time_tracker_db:query(?CREATE_USER_QUERY, [UserName]),
     {ok, #{<<"id">> => UserId}}.
 
+-spec delete(Args :: map()) ->
+    ok.
 delete(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     {ok, _} = time_tracker_db:query(?DELETE_USER_QUERY, [UserId]),
     ok.
 
+-spec list(Args :: map()) ->
+    {ok, Response :: map()}.
 list(_Args) ->
     {ok, _, Users} = time_tracker_db:query(?GET_USERS_QUERY, []),
     Maps = [

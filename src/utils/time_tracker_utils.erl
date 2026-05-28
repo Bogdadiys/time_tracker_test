@@ -2,6 +2,8 @@
 
 -export([time_to_binary/1]).
 
+-spec time_to_binary(Time :: calendar:time() | null) ->
+    binary().
 time_to_binary(null) ->
     <<"">>;
 time_to_binary({Hours, Minutes, Seconds}) ->

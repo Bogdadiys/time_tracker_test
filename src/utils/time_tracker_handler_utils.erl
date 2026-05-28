@@ -3,6 +3,10 @@
 -export([dispatch/2]).
 -export([encode_result/1]).
 
+-spec dispatch(Path :: binary(), Args :: map()) ->
+    ok |
+    {ok, map()} |
+    {error, atom()}.
 dispatch(Path, Args) ->
     case Path of
         <<"/card/touch">> ->
@@ -39,6 +43,8 @@ dispatch(Path, Args) ->
             {error, not_found}
     end.
 
+-spec encode_result(ok | {ok, Data :: map()} | {error, Reason :: atom()}) ->
+    {ok, Json :: binary()}.
 encode_result({ok, Data}) ->
     Body = #{
         <<"status">> => <<"ok">>,

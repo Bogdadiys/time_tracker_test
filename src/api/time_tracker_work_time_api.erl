@@ -78,6 +78,9 @@
 ").
 
 %% API
+-spec set(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 set(Args) ->
     UserId    = maps:get(<<"user_id">>, Args),
     StartTime = maps:get(<<"start_time">>, Args),
@@ -91,6 +94,9 @@ set(Args) ->
             {error, db_error}
     end.
 
+-spec get(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 get(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     case time_tracker_db:query(?GET_WORK_TIME_QUERY, [UserId]) of
@@ -107,6 +113,9 @@ get(Args) ->
             {error, db_error}
     end.
 
+-spec add_exclusion(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 add_exclusion(Args) ->
     UserId        = maps:get(<<"user_id">>, Args),
     StartDateTime = maps:get(<<"start_datetime">>, Args),
@@ -126,6 +135,9 @@ add_exclusion(Args) ->
             {error, db_error}
     end.
 
+-spec delete_exclusion(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 delete_exclusion(Args) ->
     ExclusionId = maps:get(<<"id">>, Args),
     case time_tracker_db:query(?DELETE_EXCLUSION_QUERY, [ExclusionId]) of
@@ -136,6 +148,9 @@ delete_exclusion(Args) ->
             {error, db_error}
     end.
 
+-spec get_exclusion(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 get_exclusion(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     case time_tracker_db:query(?GET_EXCLUSION_QUERY, [UserId]) of
@@ -154,6 +169,9 @@ get_exclusion(Args) ->
             {error, db_error}
     end.
 
+-spec history_by_user(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 history_by_user(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     case time_tracker_db:query(?GET_HISTORY_QUERY, [UserId]) of
@@ -171,6 +189,9 @@ history_by_user(Args) ->
             {error, db_error}
     end.
 
+-spec statistic_by_user(Args :: map()) ->
+    {ok, Response :: map()} |
+    {error, db_error}.
 statistic_by_user(Args) ->
     UserId = maps:get(<<"user_id">>, Args),
     Filter = maps:get(<<"filter">>, Args),
