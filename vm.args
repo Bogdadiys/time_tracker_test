@@ -1,0 +1,54 @@
+## Name of the node
+-name time_tracker_test@127.0.0.1
+
+## Cookie for distributed erlang
+-setcookie time_tracker_test
+
+## Heartbeat management; auto-restarts VM if it dies or becomes unresponsive
+## (Disabled by default..use with caution!)
+##-heart
+
+## Enable kernel poll and a few async threads
++K true
+# Async Processes
++A 8
+
+## Increase number of concurrent ports/sockets
+##-env ERL_MAX_PORTS 4096
+
+## Tweak GC to run more often
+##-env ERL_FULLSWEEP_AFTER 10
+
+# Max concurrent processes def 262144
++P 16777216
+
+# Max concurrent ports def 65536
++Q 131072
+
+#### Schedulers
+
++scl true
+
+# schedulers bind type
++stbt ps
+
+#schedulers stack size default 128 kwords
++sss 1024
+
+#schedulers dirty size default 40 kwords
+#+sssdcpu  40
+
+#schedulers IO dirty size default 40 kwords
+#+sssdio  40
+
+#Schedulers utilization
++sub true
+
+## Options from version 2.0.0
+#-mnesia dump_log_write_threshold 10000
+#-smp enable
+
+#-debug 1
+-env ERL_MAX_ETS_TABLES 100000
+
+#-connect_all false
