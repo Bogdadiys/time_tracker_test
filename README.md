@@ -327,13 +327,26 @@ erl -pa deps/*/ebin ebin -config env/dev.config -s time_tracker_test_app -sname 
 
 ## Тестування
 
-Автоматизованих тестів (EUnit/Common Test) у репозиторії наразі **немає**.
-Доступні стандартні цілі erlang.mk:
+EUnit-тести покривають три API-модулі й лежать у [`test/`](test):
+
+| Сьют | Модуль |
+|---|---|
+| `time_tracker_user_api_tests` | `time_tracker_user_api` |
+| `time_tracker_card_api_tests` | `time_tracker_card_api` |
+| `time_tracker_work_time_api_tests` | `time_tracker_work_time_api` |
+
+Тести **не потребують Postgres чи RabbitMQ**: шар БД (`time_tracker_db:query/2`)
+підмінюється через [`meck`](https://github.com/eproxus/meck) (підключений як
+`TEST_DEPS` у `Makefile`), а перевіряється трансформація відповіді БД у
+підсумкову JSON-структуру та гілки помилок (`already_closed`,
+`already_assigned`, `already_deleted`, `db_error`). У `statistic_by_user`
+детерміновані поля (лічильники запізнень/відходів, відпрацьований час, дні
+відпустки) перевіряються точно, а похідні від поточної дати — структурно/за
+типом.
 
 ```bash
-make eunit       # модульні тести (коли з'являться)
-make ct          # Common Test
-make dialyzer    # статичний аналіз (DIALYZER_DIRS = ebin)
+make eunit                                   # усі модульні тести
+make eunit t=time_tracker_card_api_tests     # один сьют
 ```
 
 ---
@@ -343,7 +356,9 @@ make dialyzer    # статичний аналіз (DIALYZER_DIRS = ebin)
 - Немає автентифікації/авторизації.
 - Схема застосовується одним файлом [`db.sql`](db.sql); інструмента поетапних
   міграцій немає.
-- Немає автоматизованих тестів.
+- Тестами покрито лише API-модулі (через мок `time_tracker_db`); транспортні
+  шари (HTTP-/MQ-handler, `time_tracker_amqp`, `time_tracker_db`) та валідатор
+  автоматичними тестами не покриті.
 - `time_tracker_db:query/2` відкриває нове з'єднання на кожен запит (без пулу).
 - Назва exchange (`mq_exchange`) не винесена в конфіг — лише хост і облікові
   дані RabbitMQ.

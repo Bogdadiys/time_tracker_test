@@ -12,6 +12,9 @@ dep_amqp_client = hex 3.12.13
 
 BUILD_DEPS += relx
 
+TEST_DEPS = meck
+dep_meck = hex 0.9.2
+
 CONFIG ?= dev
 RELX_OPTS = -o _rel/$(CONFIG) --sys_config $(CURDIR)/env/$(CONFIG).config
 VM_ARGS_FILE = $(CURDIR)/_rel/$(CONFIG)/time_tracker_test/releases/$(PROJECT_VERSION)/vm.args
