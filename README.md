@@ -29,7 +29,7 @@
 
 ## Вступ
 
-`time_tracker_test` — навчально-демонстраційний проєкт, створений у рамках
+`time_tracker_test` — демонстраційний проєкт, створений у рамках
 тестового завдання для співбесіди. Його мета — показати типовий бекенд-сервіс
 на стеку Erlang/OTP, який охоплює найпоширеніші задачі реальних систем:
 
@@ -40,8 +40,7 @@
 - агрегацію та видачу статистики.
 
 Проєкт навмисно тримається мінімальним за обсягом коду, але повним за
-переліком технологій. Він не є частиною продакшн-екосистеми Pibox і не
-призначений для розгортання у реальному оточенні.
+переліком технологій.
 
 ## Загальний опис
 
@@ -281,9 +280,12 @@ catch-all: будь-який `POST` із JSON-тілом, де **сам URL-шл
 ```erlang
 {time_tracker_test, [
     {cowboy_port, 8181},
-    {db_host, "localhost"}, {db_port, 5432},
-    {db_user, "postgres"}, {db_password, "password"},
-    {mq_username, <<"guest">>}, {mq_password, <<"guest">>},
+    {db_host, "localhost"},
+    {db_port, 5432},
+    {db_user, "postgres"},
+    {db_password, "password"},
+    {mq_username, <<"guest">>},
+    {mq_password, <<"guest">>},
     {mq_host, "localhost"}
 ]}
 ```
@@ -321,6 +323,12 @@ make CONFIG=prod     # збірка prod-релізу у _rel/prod/ (потрі�
 
 ```bash
 erl -pa deps/*/ebin ebin -config env/dev.config -s time_tracker_test_app -sname time_tracker_test
+```
+
+або запуск через реліз:
+
+```bash
+./_rel/time_tracker_test/bin/time_tracker_test daemon
 ```
 
 ---
